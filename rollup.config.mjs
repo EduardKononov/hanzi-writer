@@ -1,8 +1,8 @@
-import { terser } from 'rollup-plugin-terser';
+import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import resolve from '@rollup/plugin-node-resolve';
 import babel from '@rollup/plugin-babel';
-import pkg from './package.json';
+import pkg from './package.json' with { type: 'json' };
 import license from 'rollup-plugin-license';
 import filesize from 'rollup-plugin-filesize';
 
