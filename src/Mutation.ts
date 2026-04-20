@@ -27,7 +27,7 @@ class Delay implements GenericMutation {
   _duration: number;
   _startTime: number | null;
   _paused: boolean;
-  _timeout!: NodeJS.Timeout;
+  _timeout!: ReturnType<typeof setTimeout>;
   _resolve: (() => void) | undefined;
 
   constructor(duration: number) {
@@ -231,7 +231,7 @@ function isAlreadyAtEnd<T>(
   for (const key in endValues) {
     const endValue = endValues[key];
     const startValue = startValues?.[key];
-    if (endValue >= 0) {
+    if (typeof endValue === 'number' && endValue >= 0) {
       if (endValue !== startValue) {
         return false;
       }
