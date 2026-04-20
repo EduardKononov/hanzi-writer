@@ -220,6 +220,32 @@ export default class HanziWriter {
     );
   }
 
+  showPartialCharacter(
+    visibleStrokeCount: number,
+    options: {
+      duration?: number;
+      onComplete?: OnCompleteFunction;
+    } = {},
+  ) {
+    this.cancelQuiz();
+    const duration = options.duration ?? 0;
+    return this._withData(() =>
+      this._renderState
+        ?.run(
+          characterActions.showPartialCharacter(
+            'main',
+            this._character!,
+            visibleStrokeCount,
+            duration,
+          ),
+        )
+        .then((res) => {
+          options.onComplete?.(res);
+          return res;
+        }),
+    );
+  }
+
   highlightStroke(
     strokeNum: number,
     options: {
@@ -467,6 +493,11 @@ export default class HanziWriter {
     }
     const character = await this._withData(() => this._character);
     return character!;
+  }
+
+  async getStrokeCount(): Promise<number> {
+    const character = await this.getCharacterData();
+    return character.strokes.length;
   }
 
   _assignOptions(options: Partial<HanziWriterOptions>): ParsedHanziWriterOptions {

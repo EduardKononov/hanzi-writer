@@ -2,7 +2,7 @@ import Stroke from './models/Stroke';
 import { ColorObject, RecursivePartial } from './typings/types';
 import Character from './models/Character';
 import Mutation, { GenericMutation } from './Mutation';
-import { objRepeat } from './utils';
+import { objRepeat, objRepeatCb } from './utils';
 import { CharacterName, CharacterRenderState, RenderStateObject } from './RenderState';
 
 export const showStrokes = (
@@ -137,6 +137,30 @@ export const animateSingleStroke = (
   return [
     new Mutation(`character.${charName}`, mutationStateFunc),
     ...animateStroke(charName, stroke, speed),
+  ];
+};
+
+/** Show the first `visibleStrokeCount` strokes (indices `0 .. visibleStrokeCount - 1`) at full opacity; hide the rest. */
+export const showPartialCharacter = (
+  charName: CharacterName,
+  character: Character,
+  visibleStrokeCount: number,
+  duration: number,
+): GenericMutation[] => {
+  const n = Math.max(0, Math.min(visibleStrokeCount, character.strokes.length));
+  return [
+    new Mutation(
+      `character.${charName}`,
+      {
+        opacity: 1,
+        strokes: objRepeatCb(character.strokes.length, (i) =>
+          i < n
+            ? { opacity: 1, displayPortion: 1 }
+            : { opacity: 0, displayPortion: 1 },
+        ) as CharacterRenderState['strokes'],
+      },
+      { duration, force: true },
+    ),
   ];
 };
 
