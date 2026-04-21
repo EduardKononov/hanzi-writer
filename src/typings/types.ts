@@ -76,8 +76,92 @@ export type QuizOptions = {
   averageDistanceThreshold: number;
   onMistake?: (strokeData: StrokeData) => void;
   onCorrectStroke?: (strokeData: StrokeData) => void;
-  /** Callback when the quiz completes */
-  onComplete?: (summary: { character: string; totalMistakes: number }) => void;
+  /** Callback when the quiz completes or is cancelled (see `canceled` on the summary). */
+  onComplete?: (summary: QuizResult) => void;
+};
+
+export type QuizOptionsForLog = Omit<
+  QuizOptions,
+  'onMistake' | 'onCorrectStroke' | 'onComplete'
+>;
+
+type QuizLogEventBase = {
+  seq: number;
+  msSinceQuizStart: number;
+};
+
+export type QuizLogEvent =
+  | (QuizLogEventBase & {
+      type: 'QuizStarted';
+      character: string;
+      options: QuizOptionsForLog;
+    })
+  | (QuizLogEventBase & {
+      type: 'DrawingStarted';
+      strokeNum: number;
+    })
+  | (QuizLogEventBase & {
+      type: 'StrokeAttemptEvaluated';
+      strokeNum: number;
+      accepted: boolean;
+      isBackwards?: boolean;
+    })
+  | (QuizLogEventBase & {
+      type: 'HintShown';
+      strokeNum: number;
+    })
+  | (QuizLogEventBase & {
+      type: 'StrokeIgnoredTooShort';
+      strokeNum: number;
+    })
+  | (QuizLogEventBase & {
+      type: 'QuizCompleted';
+      totalStrokes: number;
+    })
+  | (QuizLogEventBase & {
+      type: 'QuizCancelled';
+      reason?: 'user' | 'internal';
+    });
+
+/** Payload for a new log row before `seq` / `msSinceQuizStart` are assigned. */
+export type QuizLogEventInput =
+  | {
+      type: 'QuizStarted';
+      character: string;
+      options: QuizOptionsForLog;
+    }
+  | {
+      type: 'DrawingStarted';
+      strokeNum: number;
+    }
+  | {
+      type: 'StrokeAttemptEvaluated';
+      strokeNum: number;
+      accepted: boolean;
+      isBackwards?: boolean;
+    }
+  | {
+      type: 'HintShown';
+      strokeNum: number;
+    }
+  | {
+      type: 'StrokeIgnoredTooShort';
+      strokeNum: number;
+    }
+  | {
+      type: 'QuizCompleted';
+      totalStrokes: number;
+    }
+  | {
+      type: 'QuizCancelled';
+      reason?: 'user' | 'internal';
+    };
+
+export type QuizResult = {
+  events: QuizLogEvent[];
+  character: string;
+  totalMistakes: number;
+  canceled?: boolean;
 };
 
 export type LoadingManagerOptions = {

@@ -57,6 +57,9 @@ const opts: any = {
   highlightOnComplete: true,
   highlightCompleteColor: null,
   quizStartStrokeNum: 0,
+  markStrokeCorrectAfterMisses: false,
+  acceptBackwardsStrokes: false,
+  averageDistanceThreshold: 350,
 
   // undocumented obscure options
 
@@ -191,7 +194,8 @@ describe('Quiz', () => {
         renderState,
         new Positioner({ padding: 20, width: 200, height: 200 }),
       );
-      quiz.startQuiz(Object.assign({}, opts));
+      const onComplete = jest.fn();
+      quiz.startQuiz(Object.assign({}, opts, { onComplete }));
 
       quiz.startUserStroke({ x: 10, y: 20 });
       quiz.continueUserStroke({ x: 12, y: 23 });
@@ -201,6 +205,12 @@ describe('Quiz', () => {
 
       quiz.cancel();
       await resolvePromises();
+
+      expect(onComplete).toHaveBeenCalledTimes(1);
+      const summary = onComplete.mock.calls[0][0];
+      expect(summary.canceled).toBe(true);
+      expect(summary.character).toBe('人');
+      expect(summary.events[summary.events.length - 1].type).toBe('QuizCancelled');
 
       expect(quiz._isActive).toBe(false);
       clock.tick(1000);
@@ -516,6 +526,13 @@ describe('Quiz', () => {
       });
       expect(onCorrectStroke).not.toHaveBeenCalled();
       expect(onComplete).not.toHaveBeenCalled();
+      const backwardEv = quiz._events.find((e) => e.type === 'StrokeAttemptEvaluated');
+      expect(backwardEv && backwardEv.type === 'StrokeAttemptEvaluated' && !backwardEv.accepted).toBe(
+        true,
+      );
+      expect(
+        backwardEv && backwardEv.type === 'StrokeAttemptEvaluated' && backwardEv.isBackwards,
+      ).toBe(true);
 
       clock.tick(1000);
       await resolvePromises();
@@ -556,6 +573,9 @@ describe('Quiz', () => {
       expect(onMistake).not.toHaveBeenCalled();
       expect(onCorrectStroke).not.toHaveBeenCalled();
       expect(onComplete).not.toHaveBeenCalled();
+      const ignored = quiz._events.filter((e) => e.type === 'StrokeIgnoredTooShort');
+      expect(ignored).toHaveLength(1);
+      expect(ignored[0].strokeNum).toBe(0);
 
       clock.tick(1000);
       await resolvePromises();
@@ -686,6 +706,8 @@ describe('Quiz', () => {
       });
       expect(onCorrectStroke).not.toHaveBeenCalled();
       expect(onComplete).not.toHaveBeenCalled();
+      expect(quiz._events.filter((e) => e.type === 'HintShown')).toHaveLength(1);
+      expect(quiz._events.filter((e) => e.type === 'HintShown')[0].strokeNum).toBe(0);
 
       clock.tick(1000);
       await resolvePromises();
@@ -881,10 +903,23 @@ describe('Quiz', () => {
         isBackwards: false,
       });
       expect(onComplete).toHaveBeenCalledTimes(1);
-      expect(onComplete).toHaveBeenLastCalledWith({
+      const summary = onComplete.mock.calls[0][0];
+      expect(summary).toMatchObject({
         character: '人',
         totalMistakes: 0,
+        canceled: false,
       });
+      expect(summary.events.map((e: { type: string }) => e.type)).toEqual([
+        'QuizStarted',
+        'DrawingStarted',
+        'StrokeAttemptEvaluated',
+        'DrawingStarted',
+        'StrokeAttemptEvaluated',
+        'QuizCompleted',
+      ]);
+      expect(summary.events.every((e: { seq: number }, i: number) => e.seq === i)).toBe(
+        true,
+      );
       expect(onMistake).not.toHaveBeenCalled();
 
       clock.tick(1000);

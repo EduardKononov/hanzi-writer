@@ -6,7 +6,14 @@ import * as quizActions from './quizActions';
 import * as geometry from './geometry';
 import * as characterActions from './characterActions';
 import Character from './models/Character';
-import { ParsedHanziWriterOptions, Point, StrokeData } from './typings/types';
+import {
+  ParsedHanziWriterOptions,
+  Point,
+  QuizLogEvent,
+  QuizLogEventInput,
+  QuizOptionsForLog,
+  StrokeData,
+} from './typings/types';
 import RenderState from './RenderState';
 import { GenericMutation } from './Mutation';
 
@@ -28,6 +35,10 @@ export default class Quiz {
   _totalMistakes = 0;
   _userStroke: UserStroke | undefined;
   _userStrokesIds: Array<number> | undefined;
+
+  _events: QuizLogEvent[] = [];
+  _quizStartTime = 0;
+  _nextSeq = 0;
 
   constructor(character: Character, renderState: RenderState, positioner: Positioner) {
     this._character = character;
@@ -54,6 +65,15 @@ export default class Quiz {
     this._mistakesOnStroke = 0;
     this._totalMistakes = 0;
 
+    this._events = [];
+    this._quizStartTime = performance.now();
+    this._nextSeq = 0;
+    this._appendEvent({
+      type: 'QuizStarted',
+      character: this._character.symbol,
+      options: this._quizOptionsForLog(options),
+    });
+
     return this._renderState.run(
       quizActions.startQuiz(
         this._character,
@@ -73,7 +93,11 @@ export default class Quiz {
     const point = this._positioner.convertExternalPoint(externalPoint);
     const strokeId = counter();
     this._userStroke = new UserStroke(strokeId, point, externalPoint);
-    this._userStrokesIds?.push(strokeId)
+    this._userStrokesIds?.push(strokeId);
+    this._appendEvent({
+      type: 'DrawingStarted',
+      strokeNum: this._currentStrokeIndex,
+    });
     return this._renderState.run(quizActions.startUserStroke(strokeId, point));
   }
 
@@ -105,6 +129,10 @@ export default class Quiz {
 
     // skip single-point strokes
     if (this._userStroke.points.length === 1) {
+      this._appendEvent({
+        type: 'StrokeIgnoredTooShort',
+        strokeNum: this._currentStrokeIndex,
+      });
       this._userStroke = undefined;
       return;
     }
@@ -132,8 +160,10 @@ export default class Quiz {
       isMatch || isForceAccepted || (meta.isStrokeBackwards && acceptBackwardsStrokes);
 
     if (isAccepted) {
+      this._appendStrokeEvaluated(true, meta);
       this._handleSuccess(meta);
     } else {
+      this._appendStrokeEvaluated(false, meta);
       this._handleFailure(meta);
 
       const {
@@ -146,6 +176,10 @@ export default class Quiz {
         showHintAfterMisses !== false &&
         this._mistakesOnStroke >= showHintAfterMisses
       ) {
+        this._appendEvent({
+          type: 'HintShown',
+          strokeNum: this._currentStrokeIndex,
+        });
         this._renderState.run(
           characterActions.highlightStroke(
             currentStroke,
@@ -160,12 +194,52 @@ export default class Quiz {
   }
 
   cancel() {
+    const wasActive = this._isActive;
+    if (wasActive && this._options) {
+      this._appendEvent({
+        type: 'QuizCancelled',
+        reason: 'user',
+      });
+      this._options.onComplete?.({
+        events: [...this._events],
+        character: this._character.symbol,
+        totalMistakes: this._totalMistakes,
+        canceled: true,
+      });
+    }
     this._isActive = false;
     if (this._userStrokesIds) {
       this._renderState.run(
         quizActions.removeAllUserStrokes( this._userStrokesIds ),
       );
     }
+  }
+
+  _quizOptionsForLog(o: ParsedHanziWriterOptions): QuizOptionsForLog {
+    return {
+      leniency: o.leniency,
+      showHintAfterMisses: o.showHintAfterMisses,
+      highlightOnComplete: o.highlightOnComplete,
+      acceptBackwardsStrokes: o.acceptBackwardsStrokes,
+      quizStartStrokeNum: o.quizStartStrokeNum,
+      markStrokeCorrectAfterMisses: o.markStrokeCorrectAfterMisses,
+      averageDistanceThreshold: o.averageDistanceThreshold,
+    };
+  }
+
+  _appendEvent(event: QuizLogEventInput): void {
+    const seq = this._nextSeq++;
+    const msSinceQuizStart = Math.round(performance.now() - this._quizStartTime);
+    this._events.push({ ...event, seq, msSinceQuizStart } as QuizLogEvent);
+  }
+
+  _appendStrokeEvaluated(accepted: boolean, meta: StrokeMatchResultMeta): void {
+    this._appendEvent({
+      type: 'StrokeAttemptEvaluated',
+      strokeNum: this._currentStrokeIndex,
+      accepted,
+      ...(meta.isStrokeBackwards ? { isBackwards: true } : {}),
+    });
   }
 
   _getStrokeData({
@@ -213,10 +287,16 @@ export default class Quiz {
     const isComplete = this._currentStrokeIndex === strokes.length;
 
     if (isComplete) {
+      this._appendEvent({
+        type: 'QuizCompleted',
+        totalStrokes: strokes.length,
+      });
       this._isActive = false;
       onComplete?.({
+        events: [...this._events],
         character: symbol,
         totalMistakes: this._totalMistakes,
+        canceled: false,
       });
       if (highlightOnComplete) {
         animation = animation.concat(

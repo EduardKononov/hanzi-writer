@@ -18,14 +18,20 @@
 			<button type="submit">Update</button>
 		</form>
 		<div class="actions">
-			<button class="js-toggle">Show/hide</button>
-			<button class="js-toggle-hint">Outline on/off</button>
-			<button class="js-animate">Animate</button>
-			<button class="js-quiz">Quiz yourself</button>
+			<button type="button" class="js-toggle">Show/hide</button>
+			<button type="button" class="js-toggle-hint">Outline on/off</button>
+			<button type="button" class="js-animate">Animate</button>
+			<button type="button" class="js-quiz">Quiz yourself</button>
 		</div>
 
 		<div id="target">
 
+		</div>
+
+		<div id="quiz-log-panel" class="quiz-log-panel" hidden>
+			<h2 class="quiz-log-panel__title">Quiz log</h2>
+			<pre class="quiz-log-panel__pre" id="quiz-log"></pre>
+			<button type="button" id="quiz-download" disabled>Download logs</button>
 		</div>
 
 		<!-- <script src="https://cdn.polyfill.io/v2/polyfill.min.js"></script> -->

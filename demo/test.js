@@ -1,58 +1,86 @@
-var writer;
-var isCharVisible;
-var isOutlineVisible;
+(function () {
+	var charInput = document.querySelector('.js-char');
+	var quizLogPanel = document.getElementById('quiz-log-panel');
+	var quizLogPre = document.getElementById('quiz-log');
+	var quizDownloadBtn = document.getElementById('quiz-download');
+	var lastQuizSummary = null;
 
-function printStrokePoints(data) {
-  var pointStrs = data.drawnPath.points.map((point) => `{x: ${point.x}, y: ${point.y}}`);
-  console.log(`[${pointStrs.join(', ')}]`);
-}
+	var writer = HanziWriter.create('target', charInput.value || '我', {
+		width: 300,
+		height: 300,
+		padding: 5,
+	});
 
-function updateCharacter() {
-  document.querySelector('#target').innerHTML = '';
+	var characterShown = true;
+	var outlineShown = true;
 
-  var character = document.querySelector('.js-char').value;
-  window.location.hash = character;
-  writer = HanziWriter.create('target', character, {
-    width: 400,
-    height: 400,
-    renderer: 'svg',
-    radicalColor: '#166E16',
-    onCorrectStroke: printStrokePoints,
-    onMistake: printStrokePoints,
-    showCharacter: false,
-  });
-  isCharVisible = true;
-  isOutlineVisible = true;
-  window.writer = writer;
-}
+	function clearQuizLog() {
+		lastQuizSummary = null;
+		quizLogPre.textContent = '';
+		quizLogPanel.hidden = true;
+		quizDownloadBtn.disabled = true;
+	}
 
-window.onload = function () {
-  var char = decodeURIComponent(window.location.hash.slice(1));
-  if (char) {
-    document.querySelector('.js-char').value = char;
-  }
+	function showQuizLog(summary) {
+		lastQuizSummary = summary;
+		quizLogPre.textContent = JSON.stringify(summary, null, 2);
+		quizLogPanel.hidden = false;
+		quizDownloadBtn.disabled = false;
+	}
 
-  updateCharacter();
+	document.querySelector('.js-char-form').addEventListener('submit', function (e) {
+		e.preventDefault();
+		var c = (charInput.value || '').trim() || '我';
+		charInput.value = c;
+		clearQuizLog();
+		writer.setCharacter(c);
+	});
 
-  document.querySelector('.js-char-form').addEventListener('submit', function (evt) {
-    evt.preventDefault();
-    updateCharacter();
-  });
+	document.querySelector('.js-toggle').addEventListener('click', function () {
+		characterShown = !characterShown;
+		if (characterShown) {
+			writer.showCharacter();
+		} else {
+			writer.hideCharacter();
+		}
+	});
 
-  document.querySelector('.js-toggle').addEventListener('click', function () {
-    isCharVisible ? writer.hideCharacter() : writer.showCharacter();
-    isCharVisible = !isCharVisible;
-  });
-  document.querySelector('.js-toggle-hint').addEventListener('click', function () {
-    isOutlineVisible ? writer.hideOutline() : writer.showOutline();
-    isOutlineVisible = !isOutlineVisible;
-  });
-  document.querySelector('.js-animate').addEventListener('click', function () {
-    writer.animateCharacter();
-  });
-  document.querySelector('.js-quiz').addEventListener('click', function () {
-    writer.quiz({
-      showOutline: true,
-    });
-  });
-};
+	document.querySelector('.js-toggle-hint').addEventListener('click', function () {
+		outlineShown = !outlineShown;
+		if (outlineShown) {
+			writer.showOutline();
+		} else {
+			writer.hideOutline();
+		}
+	});
+
+	document.querySelector('.js-animate').addEventListener('click', function () {
+		writer.animateCharacter();
+	});
+
+	document.querySelector('.js-quiz').addEventListener('click', function () {
+		clearQuizLog();
+		writer.quiz({
+			onComplete: function (summary) {
+				showQuizLog(summary);
+			},
+		});
+	});
+
+	quizDownloadBtn.addEventListener('click', function () {
+		if (!lastQuizSummary) return;
+		var name =
+			'quiz-log-' +
+			String(lastQuizSummary.character || 'char').replace(/[^\w\-]+/g, '_') +
+			'.json';
+		var blob = new Blob([JSON.stringify(lastQuizSummary, null, 2)], {
+			type: 'application/json',
+		});
+		var url = URL.createObjectURL(blob);
+		var a = document.createElement('a');
+		a.href = url;
+		a.download = name;
+		a.click();
+		URL.revokeObjectURL(url);
+	});
+})();
