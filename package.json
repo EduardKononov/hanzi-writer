@@ -26,7 +26,9 @@
     "eslint": "10.2.1",
     "hanzi-writer-data": "^2.0.1",
     "jest-canvas-mock": "2.5.2",
+    "babel-jest": "^30.3.0",
     "jest-cli": "^30.3.0",
+    "jest-environment-jsdom": "^30.3.0",
     "jest-fetch-mock": "^3.0.3",
     "nise": "^6.1.5",
     "prettier": "^3.8.3",
@@ -59,8 +61,18 @@
     ],
     "rootDir": "src",
     "coverageDirectory": "../coverage/",
-    "testURL": "https://test.com/url#tag",
+    "testEnvironmentOptions": {
+      "url": "https://test.com/url#tag"
+    },
     "collectCoverage": true,
-    "testEnvironment": "<rootDir>/../jest-jsdom-env"
+    "testEnvironment": "<rootDir>/../jest-jsdom-env",
+    "transform": {
+      "^.+\\.[tj]sx?$": [
+        "babel-jest",
+        {
+          "rootMode": "upward"
+        }
+      ]
+    }
   }
 }
