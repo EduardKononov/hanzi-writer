@@ -4,7 +4,6 @@ import resolve from '@rollup/plugin-node-resolve';
 import babel from '@rollup/plugin-babel';
 import pkg from './package.json' with { type: 'json' };
 import license from 'rollup-plugin-license';
-import filesize from 'rollup-plugin-filesize';
 
 const extensions = ['.js', '.ts'];
 
@@ -40,7 +39,6 @@ export default [
       },
     ],
     plugins: [
-      filesize(),
       resolve({ extensions }),
       typescript({
         tsconfig: './tsconfig.json',
